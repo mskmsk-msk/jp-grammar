@@ -33,6 +33,10 @@
             border-left: 3px solid #4F46E5; /* Tailwind indigo-600 */
             padding-left: 0.75rem; /* pl-3 */
             margin-bottom: 0.5rem; /* mb-2 */
+            cursor: pointer; /* 예문 클릭 가능하도록 커서 변경 */
+        }
+        .example-item:hover {
+            background-color: #f0f0f0; /* 클릭 가능한 예문에 호버 효과 */
         }
         .modal {
             display: none; 
@@ -142,7 +146,7 @@
 
     <script>
         const grammarData = [
-            // 기존 데이터 (001 ~ 115) - 이전 코드와 동일하게 유지됩니다. (양해를 위해 생략)
+            // 전체 데이터 (001 ~ 115) - 이전 코드와 동일하게 유지 (양해를 위해 생략)
             { id: 1, pattern: "~か", meaning: "~인가, ~인지, ~이나 / ~할지 ~하지 않을지", examples: [{ japanese: "図書館は何時まで開いているか教えてください。", korean: "도서관은 몇 시까지 열려 있는지 가르쳐 주세요." },{ japanese: "自転車で行くかバスで行くかまだ決めていない。", korean: "자전거로 갈지 버스로 갈지 아직 정하지 않았다." },{ japanese: "パーティーは何時に始まるか知っていますか。", korean: "파티는 몇 시에 시작되는지 알고 있습니까?" }]},
             { id: 2, pattern: "~が", meaning: "~이/가 (주어), ~을/를 (희망, 능력, 기호)", examples: [{ japanese: "りんごのケーキがおいしいそうです。", korean: "사과 케이크가 맛있다고 합니다." },{ japanese: "私はピアノをひくのが好きです。", korean: "저는 피아노 치는 것을 좋아합니다." },{ japanese: "どれがあなたの傘ですか。", korean: "어느 것이 당신의 우산입니까?" }]},
             { id: 3, pattern: "~から", meaning: "~하기 때문에 (이유), ~으로 (재료), ~로부터, ~에게서 (동작주)", examples: [{ japanese: "今日は疲れたから、早く寝ます。", korean: "오늘은 피곤하기 때문에 일찍 자겠습니다." },{ japanese: "このお酒は米から作られます。", korean: "이 술은 쌀로 만들어집니다." },{ japanese: "友達から誕生日プレゼントが届いた。", korean: "친구에게서 생일 선물이 도착했다." }]},
@@ -421,118 +425,149 @@
         const allGrammarListEl = document.getElementById('allGrammarList');
         const playPauseButtonEl = document.getElementById('playPauseButton');
 
-        // 일본어 숫자 읽기 (간단 버전)
-        const japaneseNumbers = {
-            1: "いち", 2: "に", 3: "さん", 4: "よん", 5: "ご", 6: "ろく", 7: "なな", 8: "はち", 9: "きゅう", 10: "じゅう",
-            11: "じゅういち", 12: "じゅうに", 13: "じゅうさん", 14: "じゅうよん", 15: "じゅうご", 16: "じゅうろく", 17: "じゅうなな", 18: "じゅうはち", 19: "じゅうきゅう", 20: "にじゅう",
-            // ... (필요에 따라 더 추가)
-            // 일단 115까지는 직접 추가하기 어려우므로, TTS가 숫자를 읽도록 시도합니다.
-            // 정교한 숫자 읽기는 추가 구현이 필요합니다.
-        };
-
         function getJapaneseNumberString(num) {
-            // TTS가 숫자를 직접 읽도록 시도. 더 나은 발음을 위해선 전체 숫자 변환 로직 필요
             return String(num); 
         }
 
-
         function loadVoices() {
             voices = synth.getVoices();
-            // console.log("Available voices:", voices); // 사용 가능한 음성 목록 확인 (디버깅용)
         }
-        // 음성 로드는 비동기적일 수 있으므로, voiceschanged 이벤트를 사용
         if (synth.onvoiceschanged !== undefined) {
             synth.onvoiceschanged = loadVoices;
         }
-        loadVoices(); // 초기 시도
+        loadVoices(); 
 
-        function speak(text, lang) {
+        function speak(text, lang, callback) {
             if (synth.speaking) {
-                // console.error('SpeechSynthesis.speak()_already_speaking');
-                // 현재 음성 출력이 진행 중이면, 큐에 추가하거나 나중에 처리하도록 할 수 있습니다.
-                // 여기서는 일단 중복 실행을 막습니다.
-                // 필요하다면, 현재 진행중인 speak을 cancel하고 새로 시작할 수도 있습니다.
-                // synth.cancel(); 
+                // 이미 말하는 중이면 취소하고 새로 시작 (연속 재생을 위해)
+                synth.cancel();
             }
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = lang;
-            
-            // 특정 음성 선택 (선택 사항)
             const voice = voices.find(v => v.lang === lang);
             if (voice) {
                 utterance.voice = voice;
-            } else {
-                // console.warn(`Voice for lang ${lang} not found. Using default.`);
             }
-
             utterance.onend = () => {
-                currentSpeechUtteranceIndex++;
-                if (isAutoPlaying && currentSpeechUtteranceIndex < speechQueue.length) {
-                    synth.speak(speechQueue[currentSpeechUtteranceIndex]);
-                } else if (isAutoPlaying && currentSpeechUtteranceIndex >= speechQueue.length) {
-                    // 현재 카드 읽기 완료 후 다음 카드로 자동 이동
-                    setTimeout(playNextCard, 500); // 약간의 딜레이 후 다음 카드
-                }
+                if (callback) callback();
             };
             utterance.onerror = (event) => {
-                console.error('SpeechSynthesisUtterance.onerror', event);
-                 // 에러 발생 시 자동 재생 중지
-                if(isAutoPlaying) {
-                    stopAutoPlay();
-                    alert("음성 재생 중 오류가 발생하여 자동 재생을 중지합니다. 브라우저의 음성 지원 기능을 확인해주세요.");
+                console.error('SpeechSynthesisUtterance.onerror - Event:', event);
+                console.error('SpeechSynthesisUtterance.onerror - Error Code:', event.error); // 오류 코드 로깅
+                if (event.error === 'canceled') {
+                    // console.log("Speech was canceled.");
+                } else if (isAutoPlaying) {
+                     alert(`음성 재생 중 오류가 발생했습니다 (${event.error}). 자동 재생을 중지합니다. 브라우저의 음성 지원 기능을 확인해주세요.`);
                 }
+                
+                if (isAutoPlaying && event.error !== 'canceled') {
+                    stopAutoPlay();
+                }
+                if (callback) callback(); 
             };
-            speechQueue.push(utterance); // 현재 재생목록에 추가
+            synth.speak(utterance);
         }
         
         function playCurrentCardAudio() {
-            if (!isAutoPlaying) return; // 자동 재생 중이 아니면 실행 안 함
+            if (!isAutoPlaying) return;
 
             const card = grammarData[currentCardIndex];
-            if (memorizedStatus[card.id]) { // 암기된 카드는 건너뛰기
+            if (memorizedStatus[card.id]) {
                 playNextCard();
                 return;
             }
 
-            speechQueue = []; // 현재 카드 음성 목록 초기화
+            speechQueue = [];
             currentSpeechUtteranceIndex = 0;
 
+			// 0. Card 읽기 (일본어)
+			speechQueue.push({ text: "カード" , lang: 'ja-JP' });
+			
             // 1. ID 읽기 (일본어)
-            speak(getJapaneseNumberString(card.id), 'ja-JP');
+            speechQueue.push({ text: getJapaneseNumberString(card.id), lang: 'ja-JP' });
             // 2. Pattern 읽기 (일본어)
-            speak(card.pattern, 'ja-JP');
-            // 3. Meaning 읽기 (한국어)
-            speak(card.meaning, 'ko-KR');
+            speechQueue.push({ text: card.pattern, lang: 'ja-JP' });
+            // 3. "의미" (한국어)
+            speechQueue.push({ text: "의미", lang: 'ko-KR' });
+            // 4. Meaning 읽기 (한국어, 특수문자 제외)
+            // 의미 읽기 (한국어, 특수문자 제거)
+			const cleanedMeaning = cleanTextForSpeech(card.meaning);
+			speechQueue.push({ text: cleanedMeaning, lang: 'ko-KR' });
 
-            if (speechQueue.length > 0) {
-                synth.speak(speechQueue[currentSpeechUtteranceIndex]);
-            }
+            
+            // 5. "예문 시작" (한국어)
+            speechQueue.push({ text: "예문 시작", lang: 'ko-KR' });
+            
+            // 6. 예문 읽기
+            card.examples.forEach((ex, index) => {
+                const nativeNumber = getNativeKoreanNumber(index + 1);
+                speechQueue.push({ text: `예문 ${nativeNumber}번`, lang: 'ko-KR' });
+                speechQueue.push({ text: ex.japanese, lang: 'ja-JP' });
+                const cleanedKoreanExample = ex.korean.replace(/\([^)]*\)/g, '').trim(); // 괄호와 그 안의 내용 제거
+                speechQueue.push({ text: cleanedKoreanExample, lang: 'ko-KR' });
+            });
+            
+            playNextSpeechInQueue();
         }
+
+        const nativeNumberMap = ['일', '이', '삼', '사', '오', '육', '칠', '팔', '구', '십'];
+
+        function getNativeKoreanNumber(n) {
+            if (n <= 10) return nativeNumberMap[n - 1]; // 1~10까지 처리
+            if (n < 20) return '십' + nativeNumberMap[n % 10 - 1]; // 11~19
+            if (n % 10 === 0) return nativeNumberMap[n / 10 - 1] + '십'; // 20, 30...
+            return nativeNumberMap[Math.floor(n / 10) - 1] + '십' + nativeNumberMap[n % 10 - 1]; // 나머지
+        }
+
+        function playNextSpeechInQueue() {
+            if (!isAutoPlaying || currentSpeechUtteranceIndex >= speechQueue.length) {
+                if (isAutoPlaying) { // 현재 카드 음성 재생 완료
+                    setTimeout(playNextCard, 700); // 다음 카드로 넘어가기 전 약간의 딜레이
+                }
+                return;
+            }
+            const speechItem = speechQueue[currentSpeechUtteranceIndex];
+            speak(speechItem.text, speechItem.lang, () => {
+                currentSpeechUtteranceIndex++;
+                playNextSpeechInQueue();
+            });
+        }
+		
+		function cleanTextForSpeech(text) {
+			return text
+				.replace(/\([^)]*\)/g, '')              // 괄호 안 제거
+				.replace(/[~!@#$%^&*_=+|\\:;"'<>,.?/]/g, '') // 특수문자 제거
+				.replace(/\s+/g, ' ')                   // 공백 정리
+				.trim();
+		}
+
+
 
         function playNextCard() {
             if (!isAutoPlaying) return;
             currentCardIndex = (currentCardIndex + 1);
             if (currentCardIndex >= grammarData.length) {
-                stopAutoPlay(); // 모든 카드 재생 완료
-                alert("모든 카드를 학습했습니다!");
+                stopAutoPlay(); 
+                alert("모든 카드 학습을 완료했습니다!");
                 return;
             }
-            displayCard(); // 다음 카드 표시 (내부에서 playCurrentCardAudio 호출 조건 확인)
-            playCurrentCardAudio(); // 새 카드의 오디오 재생 시작
+            displayCard(); 
+            playCurrentCardAudio(); 
         }
 
         function startAutoPlay() {
-            if (synth.speaking) { // 이미 재생 중이면 반환 (중복 실행 방지)
-                return;
+            if (synth.speaking) { 
+                synth.cancel(); // 만약 이전 재생이 멈추지 않았다면 강제 종료
             }
             isAutoPlaying = true;
             playPauseButtonEl.innerHTML = '<i class="fas fa-pause mr-1"></i> 일시 정지';
+            currentSpeechUtteranceIndex = 0; // 새 재생 시작 시 인덱스 초기화
             playCurrentCardAudio();
         }
 
         function stopAutoPlay() {
             isAutoPlaying = false;
-            synth.cancel(); // 현재 진행 중 및 대기 중인 모든 음성 취소
+            synth.cancel(); 
             speechQueue = [];
             currentSpeechUtteranceIndex = 0;
             playPauseButtonEl.innerHTML = '<i class="fas fa-play mr-1"></i> 자동 재생';
@@ -577,26 +612,52 @@
             grammarMeaningEl.textContent = card.meaning;
             
             grammarExamplesEl.innerHTML = ''; 
-            card.examples.forEach(ex => {
+            card.examples.forEach((ex, index) => {
                 const exDiv = document.createElement('div');
                 exDiv.classList.add('example-item', 'bg-gray-50', 'p-3', 'rounded-md');
                 
                 const jpP = document.createElement('p');
                 jpP.classList.add('text-indigo-600', 'font-medium', 'text-sm', 'sm:text-base', 'md:text-lg');
                 jpP.textContent = ex.japanese;
+                jpP.addEventListener('click', () => speakExample(ex.japanese, ex.korean.replace(/\([^)]*\)/g, '').trim()));
                 
                 const krP = document.createElement('p');
                 krP.classList.add('text-gray-600', 'text-xs', 'sm:text-sm', 'mt-1');
                 krP.textContent = ex.korean;
+                krP.addEventListener('click', () => speakExample(ex.japanese, ex.korean.replace(/\([^)]*\)/g, '').trim()));
                 
                 exDiv.appendChild(jpP);
                 exDiv.appendChild(krP);
                 grammarExamplesEl.appendChild(exDiv);
             });
 
-            hideDetails(); // 뜻/예문은 기본적으로 숨김
+            hideDetails(); 
             updateMemorizedButton();
         }
+
+        // 예문 클릭 시 해당 예문 발음 함수
+        function speakExample(japaneseText, koreanText) {
+            if (isAutoPlaying) stopAutoPlay(); // 자동 재생 중이면 중지
+            synth.cancel(); // 현재 진행 중인 음성 취소
+            speechQueue = [
+                { text: japaneseText, lang: 'ja-JP' },
+                { text: koreanText, lang: 'ko-KR' }
+            ];
+            currentSpeechUtteranceIndex = 0;
+            playNextSpeechInQueueForExample();
+        }
+
+        function playNextSpeechInQueueForExample() {
+             if (currentSpeechUtteranceIndex >= speechQueue.length) {
+                return; // 모든 예문 음성 재생 완료
+            }
+            const speechItem = speechQueue[currentSpeechUtteranceIndex];
+            speak(speechItem.text, speechItem.lang, () => {
+                currentSpeechUtteranceIndex++;
+                playNextSpeechInQueueForExample();
+            });
+        }
+
 
         function hideDetails() {
             meaningContainerEl.classList.remove('content-visible');
@@ -617,7 +678,7 @@
         }
         
         revealButton.addEventListener('click', () => {
-            if (isAutoPlaying) stopAutoPlay(); // 자동 재생 중지
+            if (isAutoPlaying) stopAutoPlay(); 
             if (detailsVisible) {
                 hideDetails();
             } else {
@@ -657,7 +718,7 @@
                 patternSpan.classList.add('text-sm', 'sm:text-base');
 
                 const statusSpan = document.createElement('span');
-                statusSpan.textContent = memorizedStatus[item.id] ? '✅ 외웠음' : '❌ 못 외웠음';
+                statusSpan.textContent = memorizedStatus[item.id] ? '✅ 암기' : '❌ 암기';
                 statusSpan.classList.add('text-xs', 'sm:text-sm', 'ml-2', 'font-semibold');
                 if(memorizedStatus[item.id]){
                     statusSpan.classList.add('text-green-600');
