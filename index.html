@@ -497,7 +497,10 @@
             alert("모든 카드 학습을 완료했습니다!");
             return;
         }
-        displayCard();
+        displayCard(); // 여기서 hideDetails()가 내부적으로 호출됨
+        if (isAutoPlaying) { // 자동 재생 중일 때만 강제로 뜻/예문 표시
+            showDetails();
+        }
         playCurrentCardAudio();
     }
 
@@ -507,6 +510,10 @@
         isAutoPlaying = true;
         playPauseButtonEl.innerHTML = '<i class="fas fa-pause mr-1"></i> 일시 정지';
         currentSpeechUtteranceIndex = 0;
+        // 자동 재생 시작 시 현재 카드의 뜻/예문도 보이도록 추가
+        if (detailsVisible === false) { // 만약 숨겨져 있다면 보이도록 처리
+            showDetails();
+        }
         playCurrentCardAudio();
     }
 
