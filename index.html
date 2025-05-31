@@ -363,7 +363,8 @@
     ];
 
 
-    // --- 전역 변수 ---
+    let originalGrammarData = [];
+    let isShuffled = false;
     let currentCardIndex = 0;
     let detailsVisible = false;
     let memorizedStatus = {};
@@ -381,9 +382,8 @@
     let score = 0;
     let totalQuestionsInTest = 0;
 
-    // --- DOM 요소 가져오기 ---
-    // 학습 모드
     const learningModeContainerEl = document.getElementById('learningModeContainer');
+    const appTopBarEl = document.getElementById('appTopBar');
     const grammarIdEl = document.getElementById('grammarId');
     const grammarPatternEl = document.getElementById('grammarPattern');
     const grammarMeaningEl = document.getElementById('grammarMeaning');
@@ -394,10 +394,9 @@
     const meaningContainerEl = document.getElementById('meaningContainer');
     const examplesContainerEl = document.getElementById('examplesContainer');
     const toggleMemorizedButtonEl = document.getElementById('toggleMemorizedButton');
-    const showAllButtonEl = document.getElementById('showAllButton');
     const playPauseButtonEl = document.getElementById('playPauseButton');
+    const settingsButtonEl = document.getElementById('settingsButton');
 
-    // 테스트 모드
     const testModeContainerEl = document.getElementById('testModeContainer');
     const testProgressEl = document.getElementById('testProgress');
     const testPatternEl = document.getElementById('testPattern');
@@ -406,18 +405,22 @@
     const quitTestButtonEl = document.getElementById('quitTestButton');
     const nextTestItemButtonEl = document.getElementById('nextTestItemButton');
 
-    // 공통
-    const switchModeButtonEl = document.getElementById('switchModeButton');
-    const modalEl = document.getElementById('allGrammarModal');
-    const closeModalButtonEl = document.getElementById('closeModalButton');
+    const allGrammarModalEl = document.getElementById('allGrammarModal');
+    const closeAllGrammarModalButtonEl = document.getElementById('closeAllGrammarModalButton');
     const allGrammarListEl = document.getElementById('allGrammarList');
 
-    // --- 음성 합성 관련 함수 ---
+    const settingsModalEl = document.getElementById('settingsModal');
+    const closeSettingsModalButtonEl = document.getElementById('closeSettingsModalButton');
+    const shuffleCardsButtonEl = document.getElementById('shuffleCardsButton');
+    const resetCardOrderButtonEl = document.getElementById('resetCardOrderButton');
+    const openAllGrammarListFromSettingsButtonEl = document.getElementById('openAllGrammarListFromSettingsButton');
+    const switchModeInSettingsButtonEl = document.getElementById('switchModeInSettingsButton');
+
+
     function getJapaneseNumberString(num) { return String(num); }
 
     function loadVoices() {
         voices = synth.getVoices();
-        // console.log("Available voices:", voices); // 사용 가능한 음성 목록 확인용
         const koreanVoicePreferences = ['Microsoft Heami Online (Natural) - Korean (Korea)', 'Google 한국의', '유나 (고품질)', '소라 (고품질)', '유나', '소라', 'Yuna (Enhanced)', 'Sora (Enhanced)', 'Yuna', 'Sora'];
         for (const name of koreanVoicePreferences) {
             const voice = voices.find(v => v.lang === 'ko-KR' && v.name === name);
@@ -433,42 +436,31 @@
         }
         if (!preferredJapaneseVoice) preferredJapaneseVoice = voices.find(v => v.lang === 'ja-JP' && (v.name.toLowerCase().includes('female') || v.name.includes('女性')));
         if (!preferredJapaneseVoice) preferredJapaneseVoice = voices.find(v => v.lang === 'ja-JP');
-        // console.log("Selected Korean Voice:", preferredKoreanVoice ? preferredKoreanVoice.name : "Not found/default");
-        // console.log("Selected Japanese Voice:", preferredJapaneseVoice ? preferredJapaneseVoice.name : "Not found/default");
     }
 
     if (synth.onvoiceschanged !== undefined) {
         synth.onvoiceschanged = loadVoices;
     }
-    loadVoices(); // 초기 로드
+    loadVoices();
 
     function speak(text, lang, callback) {
-        if (voices.length === 0) { // 음성 목록이 아직 로드되지 않았다면 다시 시도
-            loadVoices();
-        }
-        if (synth.speaking) { synth.cancel(); }
+        if (voices.length === 0) loadVoices();
+        if (synth.speaking) synth.cancel();
+
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = lang;
         let targetVoice = null;
         if (lang === 'ko-KR') targetVoice = preferredKoreanVoice;
         else if (lang === 'ja-JP') targetVoice = preferredJapaneseVoice;
 
-        if (targetVoice) {
-            utterance.voice = targetVoice;
-        } else {
-            // 선호/대체 음성을 못 찾았으면 해당 언어의 첫 번째 음성이라도 사용
+        if (targetVoice) utterance.voice = targetVoice;
+        else {
             const fallbackVoice = voices.find(v => v.lang === lang);
-            if (fallbackVoice) {
-                utterance.voice = fallbackVoice;
-            }
-            // console.warn(`Voice for ${lang} not found or not preferred. Using browser default or first available.`);
+            if (fallbackVoice) utterance.voice = fallbackVoice;
         }
-        // console.log(`Attempting to speak with voice: ${utterance.voice ? utterance.voice.name : 'Browser Default'} for lang ${lang}`);
-
         utterance.onend = () => { if (callback) callback(); };
         utterance.onerror = (event) => {
             console.error('SpeechSynthesisUtterance.onerror - Error Code:', event.error);
-            console.error('SpeechSynthesisUtterance.onerror - Full event object:', event); // 전체 이벤트 객체 로깅
             const isCancellationError = event.error === 'canceled' || event.error === 'interrupted';
             if (isAutoPlaying && !isCancellationError) {
                 if(typeof alert !== 'undefined') alert(`음성 재생 중 오류가 발생했습니다 (오류 코드: ${event.error || 'N/A'}). 자동 재생을 중지합니다. 브라우저의 음성 지원 기능을 확인해주세요.`);
@@ -490,22 +482,20 @@
 
     function cleanTextForSpeech(text) {
         return text
-            .replace(/\([^)]*\)/g, '')                     // 괄호 안 제거
-            .replace(/~/g, '')                             // 물결표(~) 제거
-            .replace(/[!@#$%^&*_=+|\\:;"'<>,.?/]/g, '')    // 기타 특수문자 제거
-            .replace(/\s+/g, ' ')                          // 공백 정리
+            .replace(/\([^)]*\)/g, '')
+            .replace(/~/g, '')
+            .replace(/[!@#$%^&*_=+|\\:;"'<>,.?/]/g, '')
+            .replace(/\s+/g, ' ')
             .trim();
     }
 
-
-    // --- 학습 모드 함수 ---
     function playCurrentCardAudio() {
-        if (!isAutoPlaying) return;
+        if (!isAutoPlaying || grammarData.length === 0) return;
         const card = grammarData[currentCardIndex];
-        if (memorizedStatus[card.id]) { playNextCard(); return; }
+        if (memorizedStatus[card.id] && grammarData.length > 1) { playNextCard(); return; }
         speechQueue = [];
         currentSpeechUtteranceIndex = 0;
-        speechQueue.push({ text: "카드" + getJapaneseNumberString(card.id), lang: 'ja-JP' });
+        speechQueue.push({ text: "카드 " + getJapaneseNumberString(card.id), lang: 'ja-JP' });
         speechQueue.push({ text: card.pattern, lang: 'ja-JP' });
         speechQueue.push({ text: "의미", lang: 'ko-KR' });
         speechQueue.push({ text: cleanTextForSpeech(card.meaning), lang: 'ko-KR' });
@@ -531,30 +521,21 @@
     }
 
     function playNextCard() {
-        if (!isAutoPlaying) return;
-        currentCardIndex = (currentCardIndex + 1);
-        if (currentCardIndex >= grammarData.length) {
-            stopAutoPlay();
-            alert("모든 카드 학습을 완료했습니다!");
-            return;
-        }
-        displayCard(); // 여기서 hideDetails()가 내부적으로 호출됨
-        if (isAutoPlaying) { // 자동 재생 중일 때만 강제로 뜻/예문 표시
-            showDetails();
-        }
+        if (!isAutoPlaying || grammarData.length === 0) return;
+        currentCardIndex = (currentCardIndex + 1) % grammarData.length;
+
+        showDetails();
+        displayCard();
         playCurrentCardAudio();
     }
 
     function startAutoPlay() {
-        if (isTestMode) return; // 테스트 모드에서는 실행 안 함
-        if (synth.speaking) { synth.cancel(); }
+        if (isTestMode || grammarData.length === 0) return;
+        if (synth.speaking) synth.cancel();
         isAutoPlaying = true;
-        playPauseButtonEl.innerHTML = '<i class="fas fa-pause mr-1"></i> 일시 정지';
+        playPauseButtonEl.innerHTML = '<i class="fas fa-pause"></i>';
         currentSpeechUtteranceIndex = 0;
-        // 자동 재생 시작 시 현재 카드의 뜻/예문도 보이도록 추가
-        if (detailsVisible === false) { // 만약 숨겨져 있다면 보이도록 처리
-            showDetails();
-        }
+        showDetails();
         playCurrentCardAudio();
     }
 
@@ -563,17 +544,18 @@
         synth.cancel();
         speechQueue = [];
         currentSpeechUtteranceIndex = 0;
-        playPauseButtonEl.innerHTML = '<i class="fas fa-play mr-1"></i> 자동 재생';
+        playPauseButtonEl.innerHTML = '<i class="fas fa-play"></i>';
     }
 
     function loadMemorizedStatus() {
-        const storedStatus = localStorage.getItem('japaneseGrammarMemorizedStatus');
+        const storedStatus = localStorage.getItem('japaneseGrammarMemorizedStatus_v2');
         if (storedStatus) { memorizedStatus = JSON.parse(storedStatus); }
     }
     function saveMemorizedStatus() {
-        localStorage.setItem('japaneseGrammarMemorizedStatus', JSON.stringify(memorizedStatus));
+        localStorage.setItem('japaneseGrammarMemorizedStatus_v2', JSON.stringify(memorizedStatus));
     }
     function updateMemorizedButton() {
+        if(grammarData.length === 0) return;
         const card = grammarData[currentCardIndex];
         if (memorizedStatus[card.id]) {
             toggleMemorizedButtonEl.textContent = '암기 ✅';
@@ -585,8 +567,9 @@
     }
 
     function displayCard() {
+        if(grammarData.length === 0) return;
         const card = grammarData[currentCardIndex];
-        grammarIdEl.textContent = `ID: ${String(card.id).padStart(3, '0')}`;
+        grammarIdEl.textContent = `ID: ${String(card.id).padStart(String(originalGrammarData.length).length, '0')}`;
         grammarPatternEl.textContent = card.pattern;
         grammarMeaningEl.textContent = card.meaning;
         grammarExamplesEl.innerHTML = '';
@@ -605,7 +588,9 @@
             exDiv.appendChild(krP);
             grammarExamplesEl.appendChild(exDiv);
         });
-        hideDetails();
+        if (!detailsVisible && !isAutoPlaying) hideDetails();
+        else if (isAutoPlaying) showDetails();
+
         updateMemorizedButton();
     }
 
@@ -644,7 +629,6 @@
         revealButton.textContent = '숨기기';
     }
 
-    // --- 테스트 모드 함수 ---
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -673,9 +657,12 @@
     }
 
     function loadTestItem() {
+        if(grammarData.length === 0) return;
+        const currentGrammar = shuffledTestData[currentTestItemIndex];
+
         if (currentTestItemIndex >= totalQuestionsInTest) {
             testResultEl.textContent = `테스트 종료! 최종 점수: ${score} / ${totalQuestionsInTest}`;
-            testResultEl.className = 'text-center font-semibold mb-4 p-2 rounded-md bg-blue-100 text-blue-700 h-10';
+            testResultEl.className = 'text-center font-semibold mb-4 p-2 rounded-md bg-blue-100 text-blue-700 min-h-[2.5rem]';
             testPatternEl.textContent = "모든 문제를 다 풀었습니다!";
             testChoicesEl.innerHTML = '';
             nextTestItemButtonEl.disabled = true;
@@ -683,14 +670,13 @@
             return;
         }
 
-        const item = shuffledTestData[currentTestItemIndex];
-        testProgressEl.textContent = `문제 ${currentTestItemIndex + 1} / ${totalQuestionsInTest} (ID: ${String(item.id).padStart(3, '0')})`;
-        testPatternEl.textContent = item.pattern;
+        testProgressEl.textContent = `문제 ${currentTestItemIndex + 1} / ${totalQuestionsInTest} (ID: ${String(currentGrammar.id).padStart(String(originalGrammarData.length).length, '0')})`;
+        testPatternEl.textContent = currentGrammar.pattern;
         testResultEl.textContent = '';
-        testResultEl.className = 'text-center font-semibold mb-4 p-2 rounded-md h-10';
+        testResultEl.className = 'text-center font-semibold mb-4 p-2 rounded-md min-h-[2.5rem]';
         testChoicesEl.innerHTML = '';
 
-        const choices = generateChoices(item.meaning, grammarData);
+        const choices = generateChoices(currentGrammar.meaning, grammarData);
         if (choices.length < 2) {
             testChoicesEl.innerHTML = '<p class="text-red-500 text-center">보기를 생성하기에 데이터가 부족합니다.</p>';
             nextTestItemButtonEl.disabled = false;
@@ -701,7 +687,7 @@
             const choiceButton = document.createElement('button');
             choiceButton.textContent = choiceText;
             choiceButton.classList.add('choice-button', 'p-3', 'rounded-md', 'border', 'border-gray-300', 'hover:bg-indigo-100', 'focus:outline-none', 'focus:ring-2', 'focus:ring-indigo-400', 'text-sm', 'sm:text-base');
-            choiceButton.addEventListener('click', () => handleChoiceSelection(choiceButton, choiceText, item.meaning));
+            choiceButton.addEventListener('click', () => handleChoiceSelection(choiceButton, choiceText, currentGrammar.meaning));
             testChoicesEl.appendChild(choiceButton);
         });
         nextTestItemButtonEl.disabled = true;
@@ -723,128 +709,209 @@
 
         if (selectedMeaning === correctMeaning) {
             testResultEl.textContent = '정답입니다!';
-            testResultEl.className = 'text-center font-semibold mb-4 p-2 rounded-md bg-green-100 text-green-700 h-10';
+            testResultEl.className = 'text-center font-semibold mb-4 p-2 rounded-md bg-green-100 text-green-700 min-h-[2.5rem]';
             score++;
         } else {
             testResultEl.textContent = `오답입니다. 정답: ${correctMeaning}`;
-            testResultEl.className = 'text-center font-semibold mb-4 p-2 rounded-md bg-red-100 text-red-700 h-10';
+            testResultEl.className = 'text-center font-semibold mb-4 p-2 rounded-md bg-red-100 text-red-700 min-h-[2.5rem]';
         }
         nextTestItemButtonEl.disabled = false;
         nextTestItemButtonEl.focus();
     }
 
+    function toggleAppMode() {
+        if (isTestMode) {
+            endTestMode();
+        } else {
+            startTestMode();
+        }
+        settingsModalEl.style.display = 'none';
+    }
+
     function startTestMode() {
+        if (grammarData.length === 0) {
+            if(typeof alert !== 'undefined') alert("학습할 문법이 없습니다.");
+            return;
+        }
         isTestMode = true;
         if (isAutoPlaying) stopAutoPlay();
-
         learningModeContainerEl.classList.add('hidden');
         testModeContainerEl.classList.remove('hidden');
-        switchModeButtonEl.innerHTML = '<i class="fas fa-book-open mr-1"></i> 학습 모드로';
+        appTopBarEl.classList.add('hidden');
+        switchModeInSettingsButtonEl.innerHTML = '<i class="fas fa-book-open"></i> 낱말카드 모드로';
 
         shuffledTestData = shuffleArray([...grammarData]);
         currentTestItemIndex = 0;
         score = 0;
         totalQuestionsInTest = shuffledTestData.length;
-
         nextTestItemButtonEl.disabled = true;
         quitTestButtonEl.textContent = "테스트 종료";
         testResultEl.textContent = '';
         loadTestItem();
     }
-
     function endTestMode() {
         isTestMode = false;
         learningModeContainerEl.classList.remove('hidden');
         testModeContainerEl.classList.add('hidden');
-        switchModeButtonEl.innerHTML = '<i class="fas fa-vial mr-1"></i> 테스트 모드 시작';
-
-        if (grammarData.length > 0) displayCard();
+        appTopBarEl.classList.remove('hidden');
+        switchModeInSettingsButtonEl.innerHTML = '<i class="fas fa-vial"></i> 학습/테스트 모드로';
+        if (grammarData.length > 0) {
+            detailsVisible = false;
+            displayCard();
+        }
     }
 
-    // --- 이벤트 리스너 ---
-    playPauseButtonEl.addEventListener('click', () => {
-        if (isTestMode) return;
-        if (isAutoPlaying) stopAutoPlay(); else startAutoPlay();
-    });
+    function updateSettingsButtonsState() {
+        if (resetCardOrderButtonEl) {
+            resetCardOrderButtonEl.disabled = !isShuffled;
+            if(!isShuffled) {
+                resetCardOrderButtonEl.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                resetCardOrderButtonEl.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+    }
+
+    if(playPauseButtonEl) {
+        playPauseButtonEl.addEventListener('click', () => {
+            if (isTestMode) return;
+            if (isAutoPlaying) stopAutoPlay(); else startAutoPlay();
+        });
+    }
+    if(settingsButtonEl) {
+        settingsButtonEl.addEventListener('click', () => {
+            if (isAutoPlaying) stopAutoPlay();
+            updateSettingsButtonsState();
+            settingsModalEl.style.display = 'block';
+        });
+    }
+    if(closeSettingsModalButtonEl) {
+        closeSettingsModalButtonEl.addEventListener('click', () => {
+            settingsModalEl.style.display = 'none';
+        });
+    }
+    if(shuffleCardsButtonEl) {
+        shuffleCardsButtonEl.addEventListener('click', () => {
+            if (grammarData.length > 0) {
+                shuffleArray(grammarData);
+                currentCardIndex = 0;
+                detailsVisible = false;
+                isShuffled = true;
+                displayCard();
+                if(typeof alert !== 'undefined') alert("카드 순서를 섞었습니다!");
+                updateSettingsButtonsState();
+            }
+            settingsModalEl.style.display = 'none';
+        });
+    }
+    if(resetCardOrderButtonEl){
+        resetCardOrderButtonEl.addEventListener('click', () => {
+            if (grammarData.length > 0 && originalGrammarData.length > 0) {
+                grammarData = [...originalGrammarData];
+                currentCardIndex = 0;
+                detailsVisible = false;
+                isShuffled = false;
+                displayCard();
+                if(typeof alert !== 'undefined') alert("카드 순서를 원래대로 되돌렸습니다.");
+                updateSettingsButtonsState();
+            }
+            settingsModalEl.style.display = 'none';
+        });
+    }
+    if(openAllGrammarListFromSettingsButtonEl){
+        openAllGrammarListFromSettingsButtonEl.addEventListener('click', () => {
+            settingsModalEl.style.display = 'none';
+            if (grammarData.length === 0) return;
+            allGrammarListEl.innerHTML = '';
+            const currentDataToDisplay = isShuffled ? grammarData : originalGrammarData;
+            currentDataToDisplay.forEach((item) => {
+                const listItem = document.createElement('div');
+                listItem.classList.add('p-2', 'rounded-md', 'cursor-pointer', 'hover:bg-gray-100', 'flex', 'justify-between', 'items-center', (memorizedStatus[item.id] ? 'memorized-item' : 'not-memorized-item'));
+                const patternSpan = document.createElement('span');
+                patternSpan.textContent = `${String(item.id).padStart(String(originalGrammarData.length).length, '0')}. ${item.pattern}`;
+                patternSpan.classList.add('text-sm', 'sm:text-base');
+                const statusSpan = document.createElement('span');
+                statusSpan.textContent = memorizedStatus[item.id] ? '✅ 암기' : '❌ 암기';
+                statusSpan.classList.add('text-xs', 'sm:text-sm', 'ml-2', 'font-semibold', (memorizedStatus[item.id] ? 'text-green-600' : 'text-red-500'));
+                listItem.appendChild(patternSpan);
+                listItem.appendChild(statusSpan);
+                listItem.addEventListener('click', () => {
+                    currentCardIndex = grammarData.findIndex(gd => gd.id === item.id);
+                    if (currentCardIndex === -1 && originalGrammarData.length > 0) {
+                        currentCardIndex = originalGrammarData.findIndex(gd => gd.id === item.id);
+                    }
+                    detailsVisible = false;
+                    displayCard();
+                    allGrammarModalEl.style.display = 'none';
+                });
+                allGrammarListEl.appendChild(listItem);
+            });
+            allGrammarModalEl.style.display = 'block';
+        });
+    }
+    if(switchModeInSettingsButtonEl){
+        switchModeInSettingsButtonEl.addEventListener('click', toggleAppMode);
+    }
+
     revealButton.addEventListener('click', () => {
         if (isAutoPlaying) stopAutoPlay();
         if (detailsVisible) hideDetails(); else showDetails();
     });
     prevButton.addEventListener('click', () => {
         if (isAutoPlaying) stopAutoPlay();
+        if (grammarData.length === 0) return;
         currentCardIndex = (currentCardIndex - 1 + grammarData.length) % grammarData.length;
+        detailsVisible = false;
         displayCard();
     });
     nextButton.addEventListener('click', () => {
         if (isAutoPlaying) stopAutoPlay();
+        if (grammarData.length === 0) return;
         currentCardIndex = (currentCardIndex + 1) % grammarData.length;
+        detailsVisible = false;
         displayCard();
     });
     toggleMemorizedButtonEl.addEventListener('click', () => {
+        if (grammarData.length === 0) return;
         const card = grammarData[currentCardIndex];
         memorizedStatus[card.id] = !memorizedStatus[card.id];
         updateMemorizedButton();
         saveMemorizedStatus();
     });
-    showAllButtonEl.addEventListener('click', () => {
-        if (isAutoPlaying) stopAutoPlay();
-        allGrammarListEl.innerHTML = '';
-        grammarData.forEach((item, index) => {
-            const listItem = document.createElement('div');
-            listItem.classList.add('p-2', 'rounded-md', 'cursor-pointer', 'hover:bg-gray-100', 'flex', 'justify-between', 'items-center', (memorizedStatus[item.id] ? 'memorized-item' : 'not-memorized-item'));
-            const patternSpan = document.createElement('span');
-            patternSpan.textContent = `${String(item.id).padStart(3, '0')}. ${item.pattern}`;
-            patternSpan.classList.add('text-sm', 'sm:text-base');
-            const statusSpan = document.createElement('span');
-            statusSpan.textContent = memorizedStatus[item.id] ? '✅ 암기' : '❌ 암기';
-            statusSpan.classList.add('text-xs', 'sm:text-sm', 'ml-2', 'font-semibold', (memorizedStatus[item.id] ? 'text-green-600' : 'text-red-500'));
-            listItem.appendChild(patternSpan);
-            listItem.appendChild(statusSpan);
-            listItem.addEventListener('click', () => {
-                currentCardIndex = index;
-                displayCard();
-                modalEl.style.display = 'none';
-            });
-            allGrammarListEl.appendChild(listItem);
-        });
-        modalEl.style.display = 'block';
-    });
-    closeModalButtonEl.addEventListener('click', () => { modalEl.style.display = 'none'; });
-    window.addEventListener('click', (event) => { if (event.target == modalEl) modalEl.style.display = 'none'; });
 
+    if(closeAllGrammarModalButtonEl) closeAllGrammarModalButtonEl.addEventListener('click', () => { allGrammarModalEl.style.display = 'none'; });
+
+    window.addEventListener('click', (event) => {
+        if (event.target == allGrammarModalEl) allGrammarModalEl.style.display = 'none';
+        if (event.target == settingsModalEl) settingsModalEl.style.display = 'none';
+    });
     quitTestButtonEl.addEventListener('click', endTestMode);
     nextTestItemButtonEl.addEventListener('click', () => {
         currentTestItemIndex++;
         loadTestItem();
     });
 
-    switchModeButtonEl.addEventListener('click', () => {
-        if (isTestMode) {
-            endTestMode();
-        } else {
-            startTestMode();
-        }
-    });
-
-    // --- 앱 초기화 ---
     function initializeApp() {
+        originalGrammarData = [...grammarData];
         loadMemorizedStatus();
+        const buttonsToDisable = [playPauseButtonEl, settingsButtonEl, revealButton, prevButton, nextButton, toggleMemorizedButtonEl, shuffleCardsButtonEl, openAllGrammarListFromSettingsButtonEl, switchModeInSettingsButtonEl, resetCardOrderButtonEl];
+
         if (grammarData.length > 0) {
+            detailsVisible = false;
             displayCard();
+            buttonsToDisable.forEach(btn => { if(btn) btn.disabled = false; });
         } else {
             grammarPatternEl.textContent = "데이터가 없습니다.";
             meaningContainerEl.classList.add('content-hidden');
             examplesContainerEl.classList.add('content-hidden');
-            showAllButtonEl.disabled = true;
-            playPauseButtonEl.disabled = true;
-            revealButton.disabled = true;
-            prevButton.disabled = true;
-            nextButton.disabled = true;
-            switchModeButtonEl.disabled = true;
+            buttonsToDisable.forEach(btn => { if(btn) btn.disabled = true; });
+            if(typeof alert !== 'undefined') alert("학습할 문법 데이터가 없습니다.");
         }
         learningModeContainerEl.classList.remove('hidden');
         testModeContainerEl.classList.add('hidden');
-        switchModeButtonEl.innerHTML = '<i class="fas fa-vial mr-1"></i> 테스트 모드 시작';
+        if(appTopBarEl) appTopBarEl.classList.remove('hidden');
+        if(switchModeInSettingsButtonEl) switchModeInSettingsButtonEl.innerHTML = '<i class="fas fa-vial"></i> 학습/테스트 모드 전환';
+        updateSettingsButtonsState();
     }
 
     initializeApp();
