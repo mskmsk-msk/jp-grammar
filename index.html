@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>강민수 일본어 문법 공부</title>
+    <title>강민수의 일본어 문법 공부</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
-            font-family: 'Noto Sans KR', sans-serif;
+            font-family: 'Noto Sans KR', 'Noto Sans JP', sans-serif;
         }
         .card {
             display: flex;
@@ -30,13 +30,13 @@
             transition: opacity 0.3s ease-in, height 0.3s ease-in;
         }
         .example-item {
-            border-left: 3px solid #4F46E5; /* Tailwind indigo-600 */
-            padding-left: 0.75rem; /* pl-3 */
-            margin-bottom: 0.5rem; /* mb-2 */
-            cursor: pointer; /* 예문 클릭 가능하도록 커서 변경 */
+            border-left: 3px solid #4F46E5;
+            padding-left: 0.75rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
         }
         .example-item:hover {
-            background-color: #f0f0f0; /* 클릭 가능한 예문에 호버 효과 */
+            background-color: #f0f0f0;
         }
         .modal {
             display: none;
@@ -55,10 +55,10 @@
             padding: 20px;
             border: 1px solid #888;
             width: 90%;
-            max-width: 600px;
+            max-width: 500px;
             border-radius: 0.5rem;
             max-height: 80vh;
-            overflow-y: scroll;
+            overflow-y: auto;
         }
         .close-button {
             color: #aaa;
@@ -81,22 +81,21 @@
         .hidden {
             display: none;
         }
-        /* 선택지 버튼 스타일 */
         .choice-button {
             transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out;
         }
         .choice-button.correct {
-            background-color: #34D399 !important; /* Tailwind green-400 */
+            background-color: #34D399 !important;
             border-color: #34D399 !important;
             color: white !important;
         }
         .choice-button.incorrect {
-            background-color: #F87171 !important; /* Tailwind red-400 */
+            background-color: #F87171 !important;
             border-color: #F87171 !important;
             color: white !important;
         }
         .choice-button.selected-incorrect {
-            background-color: #F87171 !important; /* Tailwind red-400 */
+            background-color: #F87171 !important;
             border-color: #F87171 !important;
             color: white !important;
         }
@@ -104,33 +103,73 @@
             opacity: 0.7;
             cursor: not-allowed;
         }
-		
+        .top-icon-button {
+            color: #4B5563;
+            padding: 0.5rem;
+            border-radius: 9999px;
+            font-size: 1.25rem;
+        }
+        .top-icon-button:hover {
+            color: #1F2937;
+            background-color: #E5E7EB;
+        }
+        .settings-modal-button {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            width: 100%;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.75rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            color: #374151;
+            background-color: #F3F4F6;
+            border: 1px solid #D1D5DB;
+            transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+        .settings-modal-button:hover:not(:disabled) {
+            background-color: #E5E7EB;
+            border-color: #9CA3AF;
+        }
+        .settings-modal-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .settings-modal-button i {
+            margin-right: 0.75rem;
+            color: #4B5563;
+            width: 1.25rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 selection:bg-purple-300 selection:text-purple-900">
 
 <div id="learningModeContainer" class="flex justify-center w-full">
     <div class="bg-white shadow-2xl rounded-xl p-4 sm:p-6 w-full sm:w-[672px] card transform transition-all duration-500 ease-in-out">
+        <div id="appTopBar" class="w-full flex justify-between items-center py-2 mb-3">
+            <button id="playPauseButton" class="top-icon-button focus:outline-none">
+                <i class="fas fa-play"></i>
+            </button>
+            <button id="settingsButton" class="top-icon-button focus:outline-none">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
         <div>
             <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-4 sm:mb-6">일본어 문법 학습</h1>
-
             <div class="flex justify-between items-center mb-2">
-                <div id="grammarId" class="text-xs sm:text-sm text-gray-500 w-1/4"></div> 
-                <button id="toggleMemorizedButton" class="text-xs sm:text-sm py-1 px-2 rounded-md focus:outline-none w-auto"> 
+                <div id="grammarId" class="text-xs sm:text-sm text-gray-500"></div>
+                <button id="toggleMemorizedButton" class="text-xs sm:text-sm py-1 px-2 rounded-md focus:outline-none">
                 </button>
             </div>
-
-            
-			<div id="grammarPattern" class="w-full text-lg sm:text-xl md:text-2xl font-semibold text-indigo-700 mb-3 sm:mb-4 p-3 sm:p-4 bg-indigo-50 rounded-lg text-center">
-			 </div>
-
+            <div id="grammarPattern" class="w-full text-lg sm:text-xl md:text-2xl font-semibold text-indigo-700 mb-3 sm:mb-4 p-3 sm:p-4 bg-indigo-50 rounded-lg text-center">
+            </div>
             <div id="detailsContainer">
                 <div id="meaningContainer" class="content-hidden">
                     <h2 class="text-base sm:text-lg md:text-xl font-semibold text-purple-700 mt-3 sm:mt-4 mb-1 sm:mb-2">의미:</h2>
                     <p id="grammarMeaning" class="text-gray-700 bg-purple-50 p-2 sm:p-3 rounded-md text-sm sm:text-base md:text-lg">
                     </p>
                 </div>
-
                 <div id="examplesContainer" class="content-hidden mt-3 sm:mt-4">
                     <h2 class="text-base sm:text-lg md:text-xl font-semibold text-purple-700 mb-1 sm:mb-2">예문:</h2>
                     <div id="grammarExamples" class="space-y-2 sm:space-y-3">
@@ -138,43 +177,32 @@
                 </div>
             </div>
         </div>
-
-        <div class="mt-6 sm:mt-8 space-y-3"> 
-			<div class="flex items-center gap-x-3"> 
-				<button id="showAllButton" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 sm:py-3 px-4 rounded-lg shadow-md text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-green-400 flex items-center justify-center">
-					<i class="fas fa-list-ul mr-1.5"></i> 전체 보기
-				</button>
-				<button id="playPauseButton" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 sm:py-3 px-4 rounded-lg shadow-md text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 flex items-center justify-center">
-					<i class="fas fa-play mr-1.5"></i> 자동 재생
-				</button>
-			</div>
-
-			<div class="flex flex-col sm:flex-row sm:gap-x-3 items-stretch space-y-3 sm:space-y-0"> 
-				<button id="revealButton" class="w-full sm:flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 sm:py-3 px-5 sm:px-6 rounded-lg shadow-md text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 flex items-center justify-center">
-					뜻/예문 보기
-				</button>
-				<div class="w-full sm:flex-1 flex gap-x-3"> 
-					<button id="prevButton" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 sm:py-3 px-5 sm:px-6 rounded-lg shadow-md text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-indigo-400">
-						이전
-					</button>
-					<button id="nextButton" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 sm:py-3 px-5 sm:px-6 rounded-lg shadow-md text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-indigo-400">
-						다음
-					</button>
-				</div>
-			</div>
-		</div>
+        <div class="mt-6 sm:mt-8 space-y-3">
+            <button id="revealButton" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 sm:py-3 px-5 sm:px-6 rounded-lg shadow-md text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 flex items-center justify-center">
+                뜻/예문 보기
+            </button>
+            <div class="flex items-center gap-x-3 mt-3">
+                <button id="prevButton" class="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2.5 sm:py-3 px-4 rounded-lg shadow-md text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-sky-300">
+                    이전
+                </button>
+                <button id="nextButton" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 sm:py-3 px-4 rounded-lg shadow-md text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-red-300">
+                    다음
+                </button>
+            </div>
+        </div>
     </div>
+</div>
 </div>
 
 <div id="testModeContainer" class="hidden bg-white shadow-2xl rounded-xl p-4 sm:p-6 w-full max-w-2xl card transform transition-all duration-500 ease-in-out">
     <div>
         <h2 class="text-xl sm:text-2xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-500 mb-4 sm:mb-6">일본어 문법 테스트</h2>
         <div id="testProgress" class="text-sm text-gray-600 mb-2 text-center"></div>
-		<div id="testPattern" class="w-full text-lg sm:text-xl md:text-2xl font-semibold text-teal-700 mb-3 sm:mb-4 p-3 sm:p-4 bg-teal-50 rounded-lg text-center">
-		</div>
+        <div id="testPattern" class="w-full text-lg sm:text-xl md:text-2xl font-semibold text-teal-700 mb-3 sm:mb-4 p-3 sm:p-4 bg-teal-50 rounded-lg text-center">
+        </div>
         <div id="testChoices" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         </div>
-        <div id="testResult" class="text-center font-semibold mb-4 p-2 rounded-md h-10">
+        <div id="testResult" class="text-center font-semibold mb-4 p-2 rounded-md min-h-[2.5rem]">
         </div>
     </div>
     <div class="mt-6 sm:mt-8 flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 sm:space-x-4">
@@ -187,24 +215,36 @@
     </div>
 </div>
 
-<div class="mt-4 w-full max-w-2xl flex justify-center">
-    <button id="switchModeButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md text-base focus:outline-none focus:ring-2 focus:ring-yellow-400">
-        <i class="fas fa-vial mr-1"></i> 테스트 모드 시작
-    </button>
-</div>
-
 <div id="allGrammarModal" class="modal">
     <div class="modal-content">
-        <span class="close-button" id="closeModalButton">&times;</span>
+        <span class="close-button" id="closeAllGrammarModalButton">&times;</span>
         <h2 class="text-xl sm:text-2xl font-bold text-center text-indigo-600 mb-4">전체 문법 목록</h2>
         <div id="allGrammarList" class="space-y-2">
         </div>
     </div>
 </div>
 
+<div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <span class="close-button" id="closeSettingsModalButton">&times;</span>
+        <h2 class="text-xl sm:text-2xl font-bold text-center text-indigo-600 mb-6">설정</h2>
+        <button id="shuffleCardsButton" class="settings-modal-button">
+            <i class="fas fa-random"></i> 카드 순서 섞기
+        </button>
+        <button id="resetCardOrderButton" class="settings-modal-button" disabled>
+            <i class="fas fa-undo"></i> 카드 순서 원래대로
+        </button>
+        <button id="openAllGrammarListFromSettingsButton" class="settings-modal-button">
+            <i class="fas fa-list-ul"></i> 전체 문법 목록 보기
+        </button>
+        <button id="switchModeInSettingsButton" class="settings-modal-button">
+            <i class="fas fa-vial"></i> 학습/테스트 모드 전환
+        </button>
+    </div>
+</div>
+
 <script>
     const grammarData = [
-        // 전체 데이터 (001 ~ 115) - 원본 데이터 유지
         { id: 1, pattern: "~か", meaning: "~인가, ~인지, ~이나 / ~할지 ~하지 않을지", examples: [{ japanese: "図書館は何時まで開いているか教えてください。", korean: "도서관은 몇 시까지 열려 있는지 가르쳐 주세요." },{ japanese: "自転車で行くかバスで行くかまだ決めていない。", korean: "자전거로 갈지 버스로 갈지 아직 정하지 않았다." },{ japanese: "パーティーは何時に始まるか知っていますか。", korean: "파티는 몇 시에 시작되는지 알고 있습니까?" }]},
         { id: 2, pattern: "~が", meaning: "~이/가 (주어), ~을/를 (희망, 능력, 기호)", examples: [{ japanese: "りんごのケーキがおいしいそうです。", korean: "사과 케이크가 맛있다고 합니다." },{ japanese: "私はピアノをひくのが好きです。", korean: "저는 피아노 치는 것을 좋아합니다." },{ japanese: "どれがあなたの傘ですか。", korean: "어느 것이 당신의 우산입니까?" }]},
         { id: 3, pattern: "~から", meaning: "~하기 때문에 (이유), ~으로 (재료), ~로부터, ~에게서 (동작주)", examples: [{ japanese: "今日は疲れたから、早く寝ます。", korean: "오늘은 피곤하기 때문에 일찍 자겠습니다." },{ japanese: "このお酒は米から作られます。", korean: "이 술은 쌀로 만들어집니다." },{ japanese: "友達から誕生日プレゼントが届いた。", korean: "친구에게서 생일 선물이 도착했다." }]},
@@ -429,8 +469,9 @@
         utterance.onerror = (event) => {
             console.error('SpeechSynthesisUtterance.onerror - Error Code:', event.error);
             console.error('SpeechSynthesisUtterance.onerror - Full event object:', event); // 전체 이벤트 객체 로깅
-            if (isAutoPlaying && event.error !== 'canceled') {
-                alert(`음성 재생 중 오류가 발생했습니다 (오류 코드: ${event.error || 'N/A'}). 자동 재생을 중지합니다. 브라우저의 음성 지원 기능을 확인해주세요.`);
+            const isCancellationError = event.error === 'canceled' || event.error === 'interrupted';
+            if (isAutoPlaying && !isCancellationError) {
+                if(typeof alert !== 'undefined') alert(`음성 재생 중 오류가 발생했습니다 (오류 코드: ${event.error || 'N/A'}). 자동 재생을 중지합니다. 브라우저의 음성 지원 기능을 확인해주세요.`);
                 stopAutoPlay();
             }
             if (callback) callback();
@@ -464,7 +505,7 @@
         if (memorizedStatus[card.id]) { playNextCard(); return; }
         speechQueue = [];
         currentSpeechUtteranceIndex = 0;
-        speechQueue.push({ text: "カード" + getJapaneseNumberString(card.id), lang: 'ja-JP' });
+        speechQueue.push({ text: "카드" + getJapaneseNumberString(card.id), lang: 'ja-JP' });
         speechQueue.push({ text: card.pattern, lang: 'ja-JP' });
         speechQueue.push({ text: "의미", lang: 'ko-KR' });
         speechQueue.push({ text: cleanTextForSpeech(card.meaning), lang: 'ko-KR' });
